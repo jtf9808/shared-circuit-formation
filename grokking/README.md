@@ -14,6 +14,7 @@ Experiments based on [Progress measures for grokking via mechanistic interpretab
 1. Reproduced original grokking.  and have extended to work with multiple operations by adding an extra operation token between the two numbers (see modular_addition.py)
 
 ![grokking graph](original_grokking_loss.png)
+
 2. Shown that it does grok (albeit not so cleanly).
 
 ![grokking loss](plus_minus_grokking_loss.png) ![grokking precision](plus_minus_grokking_precision.png). 
