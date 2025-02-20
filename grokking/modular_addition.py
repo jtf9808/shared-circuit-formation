@@ -5,6 +5,7 @@ import einops
 import torch
 from tqdm import tqdm
 from transformer_lens import HookedTransformer, HookedTransformerConfig
+from sklearn.metrics import precision_score
 
 DATA_SEED = 599
 MODEL_SEED = 999
@@ -106,7 +107,7 @@ if __name__ == "__main__":
     operations = (lambda x, y: x + y, lambda x, y: x - y)
     dataset = ModularOperationsDataset(
         base=113,
-        train_fraction=0.375,
+        train_fraction=0.25,
         operations=operations,
     )
 
@@ -148,11 +149,14 @@ if __name__ == "__main__":
         log_probs = logits.log_softmax(dim=-1)
         correct_log_probs = log_probs.gather(dim=-1, index=labels[:, None])[:, 0]
         return -correct_log_probs.mean()
-    operations_losses = [{'train_losses': [], 'test_losses': []} for i in range(len(operations))]
+
+    operations_losses = [{'train_losses': [], 'test_losses': [], 'train_precisions': [], 'test_precisions': []} for i in range(len(operations))]
     train_losses = []
     test_losses = []
     model_checkpoints = []
     checkpoint_epochs = []
+    train_precision_scores = []
+    test_precision_scores = []
     for epoch in tqdm(range(num_epochs)):
         train_logits = model(dataset.train_data)
         train_loss = loss_fn(train_logits, dataset.train_labels)
@@ -161,18 +165,40 @@ if __name__ == "__main__":
         optimizer.step()
         optimizer.zero_grad()
 
+        # Calculate training precision
+        train_predictions = train_logits[:,-1,:].argmax(dim=-1).cpu().numpy()
+        train_labels = dataset.train_labels.cpu().numpy()
+        train_precision = precision_score(train_labels, train_predictions, average='macro')
+        train_precision_scores.append(train_precision)
+
         with torch.inference_mode():
             test_logits = model(dataset.test_data)
             test_loss = loss_fn(test_logits, dataset.test_labels)
             test_losses.append(test_loss.item())
+
+            # Calculate test precision
+            test_predictions = test_logits[:,-1,:].argmax(dim=-1).cpu().numpy()
+            test_labels = dataset.test_labels.cpu().numpy()
+            test_precision = precision_score(test_labels, test_predictions, average='macro')
+            test_precision_scores.append(test_precision)
+
             for i in range(len(operations)):
 
-                train_logits = model(dataset.train_data[i::len(operations)])
-                train_loss = loss_fn(train_logits, dataset.train_labels[i::len(operations)])
-                operations_losses[i]['train_losses'].append(train_loss.item())
-                test_logits = model(dataset.test_data[i::len(operations)])
-                test_loss = loss_fn(test_logits, dataset.test_labels[i::len(operations)])
-                operations_losses[i]['test_losses'].append(test_loss.item())
+                train_logits_op = train_logits[i::len(operations)]
+                train_loss_op = loss_fn(train_logits_op, dataset.train_labels[i::len(operations)])
+                train_predictions_op = train_logits_op[:,-1,:].argmax(dim=-1).cpu().numpy()
+                train_labels_op = dataset.train_labels[i::len(operations)].cpu().numpy()
+                train_precision_op = precision_score(train_labels_op, train_predictions_op, average='macro')
+
+                operations_losses[i]['train_losses'].append(train_loss_op.item())
+                operations_losses[i]['train_precisions'].append(train_precision_op)
+                test_logits_op = test_logits[i::len(operations)]
+                test_predictions_op = test_logits_op[:,-1,:].argmax(dim=-1).cpu().numpy()
+                test_loss_op = loss_fn(test_logits_op, dataset.test_labels[i::len(operations)])
+                test_labels_op = dataset.test_labels[i::len(operations)].cpu().numpy()
+                test_precision_op = precision_score(test_labels_op, test_predictions_op, average='macro')
+                operations_losses[i]['test_losses'].append(test_loss_op.item())
+                operations_losses[i]['test_precisions'].append(test_precision_op)
 
         if ((epoch + 1) % checkpoints_every) == 0:
             checkpoint_epochs.append(epoch)
@@ -189,6 +215,8 @@ if __name__ == "__main__":
             "checkpoint_epochs": checkpoint_epochs,
             "test_losses": test_losses,
             "train_losses": train_losses,
+            "train_precision_scores": train_precision_scores,
+            "test_precision_scores": test_precision_scores,
             "train_data": dataset.train_data,
             "test_data": dataset.test_data,
             "operations_losses": operations_losses
