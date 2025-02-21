@@ -17,6 +17,17 @@ Experiments based on [Progress measures for grokking via mechanistic interpretab
 
 2. Shown that it does grok (albeit not so cleanly).
 
-![grokking loss](plus_minus_grokking_loss.png) ![grokking precision](plus_minus_grokking_precision.png)
+Loss  |  Precision
+:-------------------------:|:-------------------------:
+![grokking loss](plus_minus_grokking_loss.png) | ![grokking precision](plus_minus_grokking_precision.png)
 
 This graph has lots of "slingshots" ([The Slingshot Mechanism: An Empirical Study of Adaptive Optimizers and the Grokking Phenomenon](https://arxiv.org/abs/2206.04817)). [Progress measures for grokking via mechanistic interpretability](https://arxiv.org/abs/2301.05217) suggests that these may be caused by rounding errors. As shown in the original graph, these shouldn't be necessary for grokking so I may be able to tune them out by adjusting the train-test data ratio or other hyper-parameters. I have already seen that doing this can affect the number of slingshots that happen.
+
+If we plot the performance on the two operations separately we can see they grok almost identically. 
+
+Loss  |  Precision
+:-------------------------:|:-------------------------:
+![grokking loss](plus_minus_grokking_loss_split.png) | ![grokking precision](plus_minus_grokking_precision_split.png)
+
+This is to be expected as the two operations are so closely linked and the model needs to learn similar logic to succeed in both. 
+The model was also trained on both operations at the same time. I will look into how changing both these factors affect grokking later on.
