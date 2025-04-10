@@ -9,7 +9,7 @@ from sklearn.metrics import precision_score
 
 DATA_SEED = 599
 MODEL_SEED = 999
-device='cuda'
+device= torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Dataset:
     ...
